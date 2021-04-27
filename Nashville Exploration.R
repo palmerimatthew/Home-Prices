@@ -3,15 +3,17 @@ library(tidyverse)
 library(plotly)
 library(assertthat)
 
-Neighborhood_Info <- readr::read_csv("./Data/Neighborhood_Info.csv")
-Price_Info <- readr::read_csv("./Data/Price_Info.csv")
+ZIP_Info <- readr::read_csv("./Data/ZIP_Info.csv")
+ZHVI_Price_Info <- readr::read_csv("./Data/ZHVI_Price_Info.csv")
 
 ### initial Nashville exploration
-Nashville_Info <- Neighborhood_Info %>%
+Nashville_Info <- ZIP_Info %>%
   dplyr::filter(City == "Nashville" & StateName == "TN") %>%
   dplyr::select(RegionID, RegionName) %>%
-  dplyr::left_join(Price_Info, by = "RegionID")
+  dplyr::left_join(ZHVI_Price_Info, by = "RegionID")
 
+
+### price_plotter -----
 price_plotter <- function(data, 
                           start_date = NULL, 
                           end_date = NULL, 
@@ -53,8 +55,8 @@ price_plotter <- function(data,
     }
     
     # adjusting start_date and end_date to end of the given month
-    start_date <- lubridate::ceiling_date(start_date, "month") - 1
-    end_date <- lubridate::floor_date(end_date, "month") - 1
+    start_date <- lubridate::floor_date(start_date, "month")
+    end_date <- lubridate::floor_date(end_date, "month")
     
     # filter to date ranges if wanted
     if (filter_to_dates) {
@@ -67,7 +69,7 @@ price_plotter <- function(data,
                                              Month == end_date ~ "End",
                                              T ~ "Neither")) %>%
       dplyr::filter(Month == "Start" | Month == "End") %>%
-      tidyr::pivot_wider(names_from = "Month", values_from = "MedianPrice") %>%
+      tidyr::pivot_wider(names_from = "Month", values_from = "MedianZHVI") %>%
       dplyr::mutate(percent_difference = (End-Start)/Start,
                     percent_difference = percent_difference*100)
     
@@ -89,13 +91,13 @@ price_plotter <- function(data,
   
   # filtering to price_floor and price_ceiling
   final_price <- data %>%
-    dplyr::filter(Month == max(Month) & MedianPrice >= price_floor & MedianPrice <= price_ceiling) %>%
+    dplyr::filter(Month == max(Month) & MedianZHVI >= price_floor & MedianZHVI <= price_ceiling) %>%
     dplyr::select(RegionID)
   
   data <- dplyr::inner_join(data, final_price, by="RegionID")
   
   # graphing data
-  g <- ggplot(data, aes(x = Month, y = MedianPrice, group = RegionName, label = percent_difference)) +
+  g <- ggplot(data, aes(x = Month, y = MedianZHVI, group = RegionName, label = percent_difference)) +
     geom_line()
   
   p <- plotly::ggplotly(g)
@@ -104,10 +106,13 @@ price_plotter <- function(data,
 }
 
 price_plotter(Nashville_Info,
-              start_date = as.Date("2018-01-01"),
+              start_date = as.Date("2015-01-01"),
               end_date = as.Date("2021-01-01"),
               filter_to_dates = F,
-              percent_diff_min = 35,
+              percent_diff_min = 50,
               percent_diff_max = NULL,
               price_floor = 0,
               price_ceiling = 400000)$plot
+
+
+
