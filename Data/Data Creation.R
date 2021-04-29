@@ -34,3 +34,28 @@ ZORI_Price_Info <- read.csv("./Data/Raw Data/Zillow_ZORI_Data.csv") %>%
 
 data.table::fwrite(ZORI_Price_Info, "./Data/ZORI_Price_Info.csv")
 
+## Freddie Mac 30 year mortgage rate -----
+raw_sheet <- openxlsx::read.xlsx("./Data/Raw Data/30YR_Mortgage_Rates.xlsx")[-1,]
+
+year_rows <- c(1, 16, 31, 46, 61, 76, 91, 106)
+year_cols <- c(2, 4, 6, 8, 10, 12, 14)
+
+Mortgage_Rates <- purrr::map_df(year_rows, function(i) {
+  purrr::map_df(year_cols, function(j) {
+    year <- as.numeric(raw_sheet[i,j])
+    temp <- raw_sheet[(i+2):(i+13), c(1, j:(j+1))] %>%
+      `colnames<-`(c("Month", "Rate", "Points")) %>%
+      dplyr::mutate(Year = year) %>%
+      dplyr::select(Year, Month, Rate, Points)
+    temp
+  })
+}) %>%
+  dplyr::filter(!is.na(Year)) %>%
+  replace(., . == "n.a.", NA) %>%
+  dplyr::mutate(Rate = round(as.numeric(Rate), 2),
+                Points = round(as.numeric(Points), 2),
+                Month = match(Month, month.name),
+                Month = as.Date(paste(1, Month, Year, sep = "-"), "%d-%m-%Y")) %>%
+  dplyr::select(-Year)
+
+data.table::fwrite(Mortgage_Rates, "./Data/Mortgage_Rates_30.csv")
